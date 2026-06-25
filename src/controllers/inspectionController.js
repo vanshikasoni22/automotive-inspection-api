@@ -1,5 +1,9 @@
 const db = require('../config/db');
 const cloudinary = require('../config/cloudinary');
+const axios = require('axios');
+const FormData = require('form-data');
+
+const AI_SERVICE_URL = 'http://localhost:8000';
 
 // Create new inspection
 const createInspection = async (req, res) => {
@@ -25,18 +29,54 @@ const createInspection = async (req, res) => {
 
     const image_url = uploadResult.secure_url;
 
-    // Save inspection record (AI fields empty for now, Phase 3 fills these)
+    // Send image to AI service for analysis
+    let aiResult = {
+      defects: [],
+      confidence_score: 0,
+      severity: null,
+      recommendation: 'manual_review'
+    };
+
+    try {
+      const formData = new FormData();
+      formData.append('image', req.file.buffer, {
+        filename: 'part-image.jpg',
+        contentType: req.file.mimetype,
+      });
+
+      const aiResponse = await axios.post(
+        `${AI_SERVICE_URL}/analyze`,
+        formData,
+        { headers: formData.getHeaders(), timeout: 30000 }
+      );
+
+      aiResult = aiResponse.data;
+    } catch (aiError) {
+      console.warn('AI service unavailable, saving without analysis:', aiError.message);
+    }
+
+    // Save inspection record with AI results
     const result = await db.query(
       `INSERT INTO inspections 
-        (inspector_id, part_name, image_url, notes)
-       VALUES ($1, $2, $3, $4)
+        (inspector_id, part_name, image_url, defects, confidence_score, severity, recommendation, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [inspector_id, part_name, image_url, notes]
+      [
+        inspector_id,
+        part_name,
+        image_url,
+        JSON.stringify(aiResult.defects),
+        aiResult.confidence_score,
+        aiResult.severity,
+        aiResult.recommendation,
+        notes
+      ]
     );
 
     res.status(201).json({
       message: 'Inspection created successfully',
-      inspection: result.rows[0]
+      inspection: result.rows[0],
+      ai_analysis: aiResult
     });
 
   } catch (err) {
