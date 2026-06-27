@@ -5,6 +5,7 @@ const FormData = require('form-data');
 
 // const AI_SERVICE_URL = 'http://localhost:8000';
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+
 // Create new inspection
 const createInspection = async (req, res) => {
   const { part_name, notes } = req.body;

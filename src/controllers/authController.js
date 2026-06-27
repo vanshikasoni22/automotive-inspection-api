@@ -89,7 +89,7 @@ const login = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Login error:', err.message);
+    console.error('Login error:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     res.status(500).json({ error: 'Server error' });
   }
 };
